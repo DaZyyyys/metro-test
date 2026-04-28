@@ -1,10 +1,22 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "framer-motion";
 
 function IconBase({ children, className = "", title = "Icon" }) {
   return (
-    <svg className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={title}>
+    <svg
+      className={className}
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      role="img"
+      aria-label={title}
+    >
       {children}
     </svg>
   );
@@ -17,6 +29,32 @@ const Icons = {
       <path d="M9 12l2 2 4-5" />
     </IconBase>
   ),
+  Clipboard: (props) => (
+    <IconBase {...props} title="Clipboard">
+      <path d="M9 4h6a2 2 0 0 1 2 2v1H7V6a2 2 0 0 1 2-2Z" />
+      <path d="M8 6H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2" />
+      <path d="M8 12h.01M11 12h5M8 16h.01M11 16h5" />
+    </IconBase>
+  ),
+  Users: (props) => (
+    <IconBase {...props} title="Users">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+      <circle cx="9.5" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </IconBase>
+  ),
+  Check: (props) => (
+    <IconBase {...props} title="Check">
+      <path d="M20 6 9 17l-5-5" />
+    </IconBase>
+  ),
+  Alert: (props) => (
+    <IconBase {...props} title="Alert">
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9v4M12 17h.01" />
+    </IconBase>
+  ),
   LogOut: (props) => (
     <IconBase {...props} title="Logout">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -24,15 +62,21 @@ const Icons = {
       <path d="M21 12H9" />
     </IconBase>
   ),
+  File: (props) => (
+    <IconBase {...props} title="File">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+    </IconBase>
+  ),
 };
 
-const accounts = [
-  { username: "leitung", password: "metro2026", role: "admin", displayName: "METRO Leitung" },
-  { username: "leo", password: "metro2026", role: "admin", displayName: "Leo Meier" },
-  { username: "juergen", password: "metro2026", role: "admin", displayName: "Juergen Wellel" },
-  { username: "trainee01", password: "test123", role: "trainee", displayName: "Trainee 01" },
-  { username: "trainee02", password: "test123", role: "trainee", displayName: "Trainee 02" },
-  { username: "trainee03", password: "test123", role: "trainee", displayName: "Trainee 03" },
+const fallbackAccounts = [
+  { username: "leo.meier", password: "metro2026", role: "admin", displayName: "Leo Meier" },
+  { username: "juergen.wellel", password: "metro2026", role: "admin", displayName: "Juergen Wellel" },
+  { username: "jordan.bradford", password: "metro2026", role: "admin", displayName: "Jordan Bradford" },
+  { username: "astro.santiago", password: "trainee2026", role: "trainee", displayName: "Astro Santiago" },
+  { username: "momo.abbas", password: "trainee2026", role: "trainee", displayName: "Momo Abbas" },
+  { username: "test-account-jw", password: "test123", role: "trainee", displayName: "Test-Account-JW" },
 ];
 
 const questions = [
@@ -204,6 +248,88 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
+async function hashPassword(password, salt) {
+  const input = `${salt}:${password}`;
+  const encoded = new TextEncoder().encode(input);
+  const buffer = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function createSalt() {
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+}
+
+function normalizeUsername(username = "") {
+  return username.trim().toLowerCase();
+}
+
+async function loginAccount(username, password) {
+  const normalized = normalizeUsername(username);
+  if (!supabase) {
+    const account = fallbackAccounts.find((a) => a.username === normalized && a.password === password.trim());
+    if (!account) throw new Error("Ungültige Zugangsdaten.");
+    return account;
+  }
+
+  const { data, error } = await supabase
+    .from("metro_users")
+    .select("*")
+    .eq("username", normalized)
+    .single();
+
+  if (error || !data) throw new Error("Ungültige Zugangsdaten.");
+  if (data.is_active === false) throw new Error("Dieser Account ist deaktiviert.");
+
+  const passwordHash = await hashPassword(password, data.salt);
+  if (passwordHash !== data.password_hash) throw new Error("Ungültige Zugangsdaten.");
+
+  return {
+    username: data.username,
+    role: data.role,
+    displayName: data.display_name,
+  };
+}
+
+async function registerAccount({ username, displayName, password }) {
+  const normalized = normalizeUsername(username);
+  if (!normalized || !displayName.trim() || password.length < 6) {
+    throw new Error("Benutzername, Anzeigename und Passwort mit mindestens 6 Zeichen sind erforderlich.");
+  }
+  if (!supabase) throw new Error("Registrierung benötigt ein aktives Backend.");
+
+  const salt = createSalt();
+  const passwordHash = await hashPassword(password, salt);
+  const { error } = await supabase.from("metro_users").insert({
+    username: normalized,
+    display_name: displayName.trim(),
+    role: "trainee",
+    password_hash: passwordHash,
+    salt,
+    is_active: true,
+  });
+  if (error) {
+    if (String(error.message || "").includes("duplicate")) throw new Error("Dieser Benutzername ist bereits vergeben.");
+    throw error;
+  }
+}
+
+async function changePassword(username, currentPassword, newPassword) {
+  const normalized = normalizeUsername(username);
+  if (newPassword.length < 6) throw new Error("Das neue Passwort muss mindestens 6 Zeichen haben.");
+  if (!supabase) throw new Error("Passwortänderung benötigt ein aktives Backend.");
+
+  const account = await loginAccount(normalized, currentPassword);
+  if (!account) throw new Error("Aktuelles Passwort ist falsch.");
+
+  const salt = createSalt();
+  const passwordHash = await hashPassword(newPassword, salt);
+  const { error } = await supabase
+    .from("metro_users")
+    .update({ password_hash: passwordHash, salt })
+    .eq("username", normalized);
+  if (error) throw error;
+}
+
 function mapDbResult(row) {
   return {
     id: row.id,
@@ -246,7 +372,10 @@ function saveLocalResults(results) {
 
 async function fetchResults() {
   if (!supabase) return getLocalResults();
-  const { data, error } = await supabase.from("metro_trainee_results").select("*").order("submitted_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("metro_trainee_results")
+    .select("*")
+    .order("submitted_at", { ascending: false });
   if (error) throw error;
   return (data || []).map(mapDbResult);
 }
@@ -262,7 +391,6 @@ async function saveResult(entry) {
 }
 
 async function replaceResult(entry) {
-  if (!entry) return;
   if (!supabase) {
     const current = getLocalResults().map((r) => (r.id === entry.id ? entry : r));
     saveLocalResults(current);
@@ -291,7 +419,12 @@ async function deleteAllResults() {
 }
 
 function normalizeText(value = "") {
-  return value.toLowerCase().replaceAll("ä", "ae").replaceAll("ö", "oe").replaceAll("ü", "ue").replaceAll("ß", "ss");
+  return value
+    .toLowerCase()
+    .replaceAll("ä", "ae")
+    .replaceAll("ö", "oe")
+    .replaceAll("ü", "ue")
+    .replaceAll("ß", "ss");
 }
 
 function keywordMatches(answer, keywords = []) {
@@ -355,18 +488,37 @@ function Button({ children, variant = "primary", className = "", ...props }) {
 }
 
 function Login({ onLogin }) {
-  const [username, setUsername] = useState("trainee01");
-  const [password, setPassword] = useState("test123");
+  const [mode, setMode] = useState("login");
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordRepeat, setPasswordRepeat] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
-    const account = accounts.find((a) => a.username === username.trim() && a.password === password.trim());
-    if (!account) {
-      setError("Ungültige Zugangsdaten.");
-      return;
+    setError("");
+    setSuccess("");
+    setLoading(true);
+    try {
+      if (mode === "register") {
+        if (password !== passwordRepeat) throw new Error("Die Passwörter stimmen nicht überein.");
+        await registerAccount({ username, displayName, password });
+        setSuccess("Account wurde erstellt. Du kannst dich jetzt einloggen.");
+        setMode("login");
+        setPassword("");
+        setPasswordRepeat("");
+        return;
+      }
+      const account = await loginAccount(username, password);
+      onLogin(account);
+    } catch (err) {
+      setError(err.message || "Ein Fehler ist aufgetreten.");
+    } finally {
+      setLoading(false);
     }
-    onLogin(account);
   }
 
   return (
@@ -382,35 +534,106 @@ function Login({ onLogin }) {
             Trainee<br /><span className="bg-gradient-to-r from-blue-200 via-white to-slate-400 bg-clip-text text-transparent">Assessment</span>
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
-            Internes Testportal für METRO-Trainees. Antworten werden gespeichert und können durch die Leitung bewertet, korrigiert und kommentiert werden.
+            Internes Testportal für METRO-Trainees. Accounts werden über das Backend verwaltet. Passwörter können nach dem Login geändert werden.
           </p>
         </div>
         <Card>
           <div className="mb-6 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500 text-white"><Icons.Shield /></div>
             <div>
-              <h2 className="text-2xl font-black">Login</h2>
-              <p className="text-sm text-slate-400">Trainee- oder Leitungsaccount</p>
+              <h2 className="text-2xl font-black">{mode === "login" ? "Login" : "Registrieren"}</h2>
+              <p className="text-sm text-slate-400">{mode === "login" ? "Trainee- oder Leitungsaccount" : "Neuen Trainee-Account erstellen"}</p>
             </div>
           </div>
           <form onSubmit={submit} className="space-y-4">
             <div>
               <label className="text-sm font-semibold text-slate-300">Benutzername</label>
-              <input value={username} onChange={(e) => setUsername(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400" />
+              <input value={username} onChange={(e) => setUsername(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400" placeholder="z. B. astro.santiago" />
             </div>
+            {mode === "register" && (
+              <div>
+                <label className="text-sm font-semibold text-slate-300">Anzeigename</label>
+                <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400" placeholder="z. B. Astro Santiago" />
+              </div>
+            )}
             <div>
               <label className="text-sm font-semibold text-slate-300">Passwort</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400" />
             </div>
+            {mode === "register" && (
+              <div>
+                <label className="text-sm font-semibold text-slate-300">Passwort wiederholen</label>
+                <input type="password" value={passwordRepeat} onChange={(e) => setPasswordRepeat(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400" />
+              </div>
+            )}
             {error && <p className="rounded-xl border border-red-300/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">{error}</p>}
-            <Button type="submit" className="w-full">Einloggen</Button>
+            {success && <p className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{success}</p>}
+            <Button type="submit" disabled={loading || !supabase && mode === "register"} className="w-full">{loading ? "Bitte warten..." : mode === "login" ? "Einloggen" : "Account erstellen"}</Button>
           </form>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button type="button" variant={mode === "login" ? "primary" : "secondary"} onClick={() => { setMode("login"); setError(""); setSuccess(""); }} className="px-4 py-2">Login</Button>
+            <Button type="button" variant={mode === "register" ? "primary" : "secondary"} onClick={() => { setMode("register"); setError(""); setSuccess(""); }} className="px-4 py-2">Registrieren</Button>
+          </div>
           <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-xs leading-6 text-slate-400">
-            Demo-Zugänge: <span className="text-white">trainee01 / test123</span> oder <span className="text-white">leitung / metro2026</span>.
+            Speicherung: <span className="text-white">{supabase ? "Backend aktiv" : "lokaler Fallback"}</span>. Registrierung funktioniert nur mit aktivem Backend.
           </div>
         </Card>
       </section>
     </main>
+  );
+}
+
+function AccountSettings({ user }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordRepeat, setNewPasswordRepeat] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    setMessage("");
+    setError("");
+    if (newPassword !== newPasswordRepeat) {
+      setError("Die neuen Passwörter stimmen nicht überein.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await changePassword(user.username, currentPassword, newPassword);
+      setMessage("Passwort wurde erfolgreich geändert.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setNewPasswordRepeat("");
+    } catch (err) {
+      setError(err.message || "Passwort konnte nicht geändert werden.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card className="mb-8">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-200"><Icons.Shield /></div>
+        <div>
+          <h3 className="text-xl font-black text-white">Account</h3>
+          <p className="text-sm text-slate-400">Eingeloggt als {user.displayName} · {user.username}</p>
+        </div>
+      </div>
+      <form onSubmit={submit} className="grid gap-3 md:grid-cols-3">
+        <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Aktuelles Passwort" className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-blue-400" />
+        <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Neues Passwort" className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-blue-400" />
+        <input type="password" value={newPasswordRepeat} onChange={(e) => setNewPasswordRepeat(e.target.value)} placeholder="Neues Passwort wiederholen" className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-blue-400" />
+        <div className="md:col-span-3 flex flex-wrap items-center gap-3">
+          <Button type="submit" disabled={loading || !supabase}>{loading ? "Speichern..." : "Passwort ändern"}</Button>
+          {!supabase && <p className="text-sm text-red-300">Passwortänderung benötigt ein aktives Backend.</p>}
+          {message && <p className="text-sm text-emerald-300">{message}</p>}
+          {error && <p className="text-sm text-red-300">{error}</p>}
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -474,6 +697,7 @@ function TestView({ user }) {
 
   return (
     <div>
+      <AccountSettings user={user} />
       <div className="mb-8 grid gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.35em] text-blue-300">Prüfung</p>
@@ -548,17 +772,8 @@ function AdminView() {
       active = false;
     };
   }, []);
-
   const selected = results.find((r) => r.id === selectedId);
   const maxPoints = getMaxPoints();
-  const total = selected ? getTotalPoints(selected.grading) : 0;
-  const percentage = maxPoints > 0 ? Math.round((total / maxPoints) * 100) : 0;
-
-  async function persistResults(next) {
-    setResults(next);
-    const updated = next.find((r) => r.id === selectedId);
-    if (updated) await replaceResult(updated);
-  }
 
   async function updateGrade(questionId, field, value) {
     const next = results.map((r) => {
@@ -572,8 +787,10 @@ function AdminView() {
       };
       return { ...r, grading, status: "In Bewertung" };
     });
+    setResults(next);
+    const updated = next.find((r) => r.id === selectedId);
     try {
-      await persistResults(next);
+      await replaceResult(updated);
     } catch (error) {
       setAdminError(error.message || "Fehler beim Speichern der Bewertung.");
     }
@@ -581,8 +798,9 @@ function AdminView() {
 
   async function updateFinalComment(value) {
     const next = results.map((r) => (r.id === selectedId ? { ...r, comment: value } : r));
+    setResults(next);
     try {
-      await persistResults(next);
+      await replaceResult(next.find((r) => r.id === selectedId));
     } catch (error) {
       setAdminError(error.message || "Fehler beim Speichern des Kommentars.");
     }
@@ -590,8 +808,9 @@ function AdminView() {
 
   async function updateStatus(value) {
     const next = results.map((r) => (r.id === selectedId ? { ...r, status: value } : r));
+    setResults(next);
     try {
-      await persistResults(next);
+      await replaceResult(next.find((r) => r.id === selectedId));
     } catch (error) {
       setAdminError(error.message || "Fehler beim Speichern des Status.");
     }
@@ -612,11 +831,12 @@ function AdminView() {
   async function finalize() {
     const next = results.map((r) => {
       if (r.id !== selectedId) return r;
-      const resultTotal = getTotalPoints(r.grading);
-      return { ...r, status: getPassedStatus(resultTotal, maxPoints) };
+      const total = getTotalPoints(r.grading);
+      return { ...r, status: getPassedStatus(total, maxPoints) };
     });
+    setResults(next);
     try {
-      await persistResults(next);
+      await replaceResult(next.find((r) => r.id === selectedId));
     } catch (error) {
       setAdminError(error.message || "Fehler beim Speichern des Status.");
     }
@@ -632,6 +852,9 @@ function AdminView() {
       setAdminError(error.message || "Fehler beim Löschen aller Ergebnisse.");
     }
   }
+
+  const total = selected ? getTotalPoints(selected.grading) : 0;
+  const percentage = maxPoints > 0 ? Math.round((total / maxPoints) * 100) : 0;
 
   return (
     <div>
@@ -650,9 +873,13 @@ function AdminView() {
 
       {adminError && <p className="mb-5 rounded-xl border border-red-300/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">{adminError}</p>}
       {loading ? (
-        <Card><p className="text-slate-300">Ergebnisse werden geladen...</p></Card>
+        <Card>
+          <p className="text-slate-300">Ergebnisse werden geladen...</p>
+        </Card>
       ) : results.length === 0 ? (
-        <Card><p className="text-slate-300">Noch keine Testabgaben vorhanden.</p></Card>
+        <Card>
+          <p className="text-slate-300">Noch keine Testabgaben vorhanden.</p>
+        </Card>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[0.9fr_1.4fr]">
           <Card>
@@ -697,7 +924,11 @@ function AdminView() {
               </div>
 
               <div className="mb-5 grid gap-3 md:grid-cols-[1fr_auto]">
-                <select value={selected.status} onChange={(e) => updateStatus(e.target.value)} className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-blue-400">
+                <select
+                  value={selected.status}
+                  onChange={(e) => updateStatus(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-blue-400"
+                >
                   <option>Bestanden</option>
                   <option>Nicht bestanden</option>
                   <option>In Bewertung</option>
@@ -707,34 +938,42 @@ function AdminView() {
               </div>
 
               <div className="space-y-5">
-                {questions.map((q, index) => {
-                  const points = Number(selected.grading?.[q.id]?.points || 0);
-                  const incomplete = points < q.points;
-                  return (
-                    <div key={q.id} className={classNames("rounded-2xl border p-4", incomplete ? "border-red-400/40 bg-red-500/10" : "border-white/10 bg-black/20")}>
-                      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-[0.25em] text-blue-300">{q.category}</p>
-                          <h4 className="mt-1 font-bold text-white">Frage {index + 1}</h4>
-                        </div>
-                        <span className={classNames("rounded-full px-3 py-1 text-xs", incomplete ? "bg-red-500/20 text-red-200" : "bg-emerald-500/15 text-emerald-300")}>{points}/{q.points}</span>
+                {questions.map((q, index) => (
+                  <div key={q.id} className={classNames("rounded-2xl border p-4", Number(selected.grading?.[q.id]?.points || 0) < q.points ? "border-red-400/40 bg-red-500/10" : "border-white/10 bg-black/20")}>
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.25em] text-blue-300">{q.category}</p>
+                        <h4 className="mt-1 font-bold text-white">Frage {index + 1}</h4>
                       </div>
-                      <p className="text-sm leading-6 text-slate-300">{q.question}</p>
-                      <div className="mt-3 rounded-xl bg-white/[0.04] p-3 text-sm leading-6 text-slate-200">{selected.answers?.[q.id] || "Keine Antwort."}</div>
-                      <p className="mt-3 text-xs leading-5 text-slate-500">Erwartung: {q.expectation}</p>
-                      <div className="mt-4 grid gap-3 md:grid-cols-[140px_1fr]">
-                        <div>
-                          <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Punkte</label>
-                          <input type="number" min="0" max={q.points} value={selected.grading?.[q.id]?.points ?? ""} onChange={(e) => updateGrade(q.id, "points", e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-blue-400" />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Korrektur / Kommentar</label>
-                          <input value={selected.grading?.[q.id]?.note || ""} onChange={(e) => updateGrade(q.id, "note", e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-blue-400" placeholder="z. B. vollständig, ungenau, wichtige Punkte fehlen..." />
-                        </div>
+                      <span className={classNames("rounded-full px-3 py-1 text-xs", Number(selected.grading?.[q.id]?.points || 0) < q.points ? "bg-red-500/20 text-red-200" : "bg-emerald-500/15 text-emerald-300")}>{Number(selected.grading?.[q.id]?.points || 0)}/{q.points}</span>
+                    </div>
+                    <p className="text-sm leading-6 text-slate-300">{q.question}</p>
+                    <div className="mt-3 rounded-xl bg-white/[0.04] p-3 text-sm leading-6 text-slate-200">{selected.answers?.[q.id] || "Keine Antwort."}</div>
+                    <p className="mt-3 text-xs leading-5 text-slate-500">Erwartung: {q.expectation}</p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-[140px_1fr]">
+                      <div>
+                        <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Punkte</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={q.points}
+                          value={selected.grading?.[q.id]?.points ?? ""}
+                          onChange={(e) => updateGrade(q.id, "points", e.target.value)}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-blue-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Korrektur / Kommentar</label>
+                        <input
+                          value={selected.grading?.[q.id]?.note || ""}
+                          onChange={(e) => updateGrade(q.id, "note", e.target.value)}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-blue-400"
+                          placeholder="z. B. vollständig, ungenau, wichtige Punkte fehlen..."
+                        />
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
 
               <div className="mt-5">
