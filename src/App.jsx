@@ -534,7 +534,7 @@ function Login({ onLogin }) {
             Trainee<br /><span className="bg-gradient-to-r from-blue-200 via-white to-slate-400 bg-clip-text text-transparent">Assessment</span>
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
-            Internes Testportal für METRO-Trainees. Accounts werden über das Backend verwaltet. Passwörter können nach dem Login geändert werden.
+            Internes Testportal für METRO-Trainees. Accounts werden eigenständig Angelegt. Passwörter können nach dem Login geändert werden.
           </p>
         </div>
         <Card>
