@@ -548,12 +548,12 @@ function Login({ onLogin }) {
           <form onSubmit={submit} className="space-y-4">
             <div>
               <label className="text-sm font-semibold text-slate-300">Benutzername</label>
-              <input value={username} onChange={(e) => setUsername(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400" placeholder="z. B. astro.santiago" />
+              <input value={username} onChange={(e) => setUsername(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400" placeholder="z. B. juergen.wellel" />
             </div>
             {mode === "register" && (
               <div>
                 <label className="text-sm font-semibold text-slate-300">Anzeigename</label>
-                <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400" placeholder="z. B. Astro Santiago" />
+                <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400" placeholder="z. B. Juergen Wellel" />
               </div>
             )}
             <div>
